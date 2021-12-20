@@ -1,0 +1,180 @@
+#!/bin/sh
+# by TUVIMEN <suchora.dominik7@gmail.com>
+# License: GNU GPLv3
+
+sby_def="def"
+sby_title="title"
+sby_author="author"
+sby_series="series"
+sby_publisher="publisher"
+sby_year="year"
+sby_isbn="identifier"
+sby_language="language"
+sby_md5="md5"
+sby_tags="tags"
+sby_extension="extension"
+
+by_id="id"
+by_title="title"
+by_publisher="publisher"
+by_year="year"
+by_pages="pages"
+by_language="language"
+by_size="filesize"
+by_extension="extension"
+
+SEARCHBY="$sby_def"
+PAGE=1
+REVERSE="DESC"
+SEARCH=""
+DOMAIN="https://libgen.st"
+RESULTS=25
+FORMAT=""
+TYPE=0
+MASK=1
+ORDERBY=""
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    -s|--search-by)
+      case "$2" in
+        def) SEARCHBY=$sby_def;;
+        title) SEARCHBY=$sby_title;;
+        author) SEARCHBY=$sby_author;;
+        series) SEARCHBY=$sby_series;;
+        publisher) SEARCHBY=$sby_publisher;;
+        year) SEARCHBY=$sby_year;;
+        isbn) SEARCHBY=$sby_isbn;;
+        language) SEARCHBY=$sby_language;;
+        md5) SEARCHBY=$sby_md5;;
+        tags) SEARCHBY=$sby_tags;;
+        extension) SEARCHBY=$sby_extension;;
+      esac
+      shift 2
+      ;;
+    -o|--order-by)
+      case "$2" in
+        id) ORDERBY=$by_id;;
+        title) ORDERBY=$by_title;;
+        publisher) ORDERBY=$by_publisher;;
+        year) ORDERBY=$by_year;;
+        pages) ORDERBY=$by_pages;;
+        language) ORDERBY=$by_language;;
+        size) ORDERBY=$by_size;;
+        extension) ORDERBY=$by_extension;;
+      esac
+      shift 2
+      ;;
+    -h|--help)
+        NAME="$(basename "$0")"
+        printf "%s [OPTION]... [PATTERN]\nSearch for PATTERN in libgen.\nExample: %s -o size -s title -p 1 'industrial society and its future'\n\n" "$NAME" "$NAME"
+        printf "Options:\n  -o,  --order-by TYPE\tsort using TYPE, that can be: id,title,publisher,year,pages,language,size,extension\n"
+        printf "  -d,  --domain DOMAIN\tset domain to DOMAIN\n"
+        printf "  -s,  --search-by TYPE\tsearch by TYPE, that can be: def,title,author,series,publisher,year,isbn,language,md5,tags,extension\n"
+        printf "  -r,  --reverse NUM\tsort in reverse\n"
+        printf "  -f,  --format FORMAT\tspecify file format for results\n"
+        printf "  -m,  --mask\t\tuse wildcards for PATTERN\n"
+        printf "  -p,  --page NUM\tshow page at NUM\n"
+        printf "  -R,  --results NUM\tshow NUM results\n"
+        printf "  -T,  --non-fiction\tsearch non-fiction tab\n"
+        printf "  -F,  --fiction\tsearch fiction tab\n"
+        printf "  -h,  --help\t\tshow help\n"
+        printf "\nLink will be copied via xclip.\n"
+        exit 0
+        ;;
+    -r|--reverse)
+        REVERSE="ASC"
+        shift
+        ;;
+    -f|--format)
+        FORMAT="$2"
+        shift 2
+        ;;
+    -m|--mask)
+        MASK=0;
+        shift
+        ;;
+    -d|--domain)
+        DOMAIN="$2"
+        shift 2
+        ;;
+    -R|--results)
+        RESULTS="$2"
+        shift 2
+        ;;
+    -p|--page)
+        PAGE="$2"
+        shift 2
+        ;;
+    -T|--non-fiction)
+        TYPE=0;
+        shift
+        ;;
+    -F|--fiction)
+        TYPE=1;
+        shift
+        ;;
+    -S|--science)
+        TYPE=2;
+        shift
+        ;;
+    *)
+      SEARCH="$1"
+      shift
+      ;;
+  esac
+done
+
+SEARCHP=$(echo "$SEARCH" | tr ' ' '+')
+
+t1="$(mktemp)"
+links="$(mktemp)"
+title="$(mktemp)"
+size="$(mktemp)"
+author="$(mktemp)"
+extension="$(mktemp)"
+trap 'rm "$t1" "$title" "$size" "$author" "$extension" "$links"' EXIT
+
+case $TYPE in
+    0)
+        pages="$(mktemp)"
+        year="$(mktemp)"
+        trap 'rm "$pages" "$year"' EXIT
+        curl -s "$DOMAIN/search.php?req=$SEARCHP&open=0&res=$RESULTS&view=detailed&phrase=$MASK&column=$SORT&page=$PAGE&sort=$ORDERBY&sortmode=$REVERSE" | hgrep 'table +rules="cols" +width="100%" +border="0"; tr /[-]/[2]' > "$t1"
+        hgrep 'td +colspan="2"; a' "$t1" -printf "%i\n" | sed 's/\&amp;/\&/g' > "$title"
+        sed -E '/<td><font color="gray">Pages:<\/font><\/td>/{N; s/[^0-9]+([0-9]+).*/Pages:\1/}; /^Pages:/!d; s/^Pages://' "$t1" > "$pages"
+        sed -E '/<td><font color="gray">Size:<\/font><\/td>/{N; s/[^0-9]+([0-9]+.*) \([0-9]+\).*/Size:\1/}; /^Size:/!d; s/^Size://' "$t1" > "$size"
+        hgrep 'td +colspan="3"; b' "$t1" -printf "%i\n" | sed -E "s/<a href=?(\"|')[^\"']+?(\"|')>//g; s/<\/a>//g; s/, /,/g" > "$author"
+        sed -E '/<td><font color="gray">Year:<\/font><\/td>/{N; s/[^0-9]+?(([0-9]+)|.*).*/Year:\1/}; /^Year:/!d; s/^Year://' "$t1" > "$year"
+        sed -E '/<td><font color="gray">Extension:<\/font><\/td>/{N; s/.*>([a-zA-Z0-9]+).*/Extension:\1/}; /^Extension:/!d; s/^Extension://' "$t1" > "$extension"
+        hgrep 'td +colspan="2"' "$t1" | grep -oE '\?md5=[A-Z0-9]+' | sed 's/^\?md5=/http:\/\/library.lol\/main\//' > "$links"
+        paste "$title" "$pages" "$size" "$year" "$author" "$extension" | nl
+        ;;
+    1)
+        [ "$SEARCHBY" = "$sby_def" ] && SEARCHBY=""
+        [ "$MASK -eq 1" ] && MASK=0 || MASK=1
+
+        curl -s "$DOMAIN/fiction/?q=$SEARCHP&criteria=$SORT&format=$FORMAT&page=$PAGE" | hgrep 'tbody; tr' > "$t1"
+        hgrep 'ul +class="catalog_authors"' "$t1" -printf "%i\n" | sed -E "s/\t//g; /^$/d; s/^<li>//g; s/<li>/,/g; s/<\/li>//g; s/<a href=?(\"|')[^\"']+?(\"|') title=?(\"|')[^\"']+?(\"|')>//g; s/<\/a>//g; s/, /,/g" > "$author"
+        hgrep 'td; a -title /[-][1]' "$t1" -printf "%i\n" > "$title"
+        hgrep 'td +title' "$t1" -printf "%i\n" | sed 's/ .*//; s/[A-Z]/\L&/g;' > "$extension"
+        hgrep 'td +title' "$t1" -printf "%i\n" | sed 's/.* //; s/\&nbsp\;//;' > "$size"
+        hgrep 'ul +class="record_mirrors_compact"' "$t1" -printf "%i\n" | sed -E 's/^<li><a href="//; s/".*//'  > "$links"
+        paste "$title" "$author" "$size" "$extension" | nl
+        ;;
+    2)
+        #t1="$(mktemp)"
+        #title="$(mktemp)"
+        #size="$(mktemp)"
+        #author="$(mktemp)"
+        #extension="$(mktemp)"
+        #trap 'rm "$t1" "$title" "$size" "$author" "$extension"' EXIT
+
+        #curl -s "$DOMAIN/scimag/?q=$SEARCHP&page=$PAGE" | hgrep 'tr'  > "$t1"
+        ;;
+esac
+
+printf 'num> '
+read -r NUMBER
+[ "$NUMBER" -gt 0 ] && curl -g -s "$(sed "s/ /%20/g; ${NUMBER}q;d" "$links")" | hgrep 'h2; a +href' -printf "%(href)a\n" | tee /dev/stderr | xclip -sel clip
