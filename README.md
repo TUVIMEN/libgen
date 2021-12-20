@@ -1,4 +1,4 @@
-#libgen
+# libgen
 A shell script for searching on libgen.
 
 ## Requirements
