@@ -28,11 +28,22 @@ PAGE=1
 REVERSE="DESC"
 SEARCH=""
 DOMAIN="https://libgen.st"
+DELIM="\t"
 RESULTS=25
 FORMAT=""
 TYPE=0
 MASK=1
 ORDERBY=""
+
+C_DOI="32"
+C_SIZE="33"
+C_EXTENSION="34"
+C_AUTHOR="35"
+C_TIME="31"
+C_PAGES="32"
+C_VOLUME="34"
+C_TITLE="39"
+COLOR=1
 
 while [ $# -gt 0 ]
 do
@@ -51,8 +62,7 @@ do
         tags) SEARCHBY=$sby_tags;;
         extension) SEARCHBY=$sby_extension;;
       esac
-      shift 2
-      ;;
+      shift;;
     -o|--order-by)
       case "$2" in
         id) ORDERBY=$by_id;;
@@ -64,67 +74,60 @@ do
         size) ORDERBY=$by_size;;
         extension) ORDERBY=$by_extension;;
       esac
-      shift 2
-      ;;
+      shift;;
     -h|--help)
         NAME="$(basename "$0")"
         printf "%s [OPTION]... [PATTERN]\nSearch for PATTERN in libgen.\nExample: %s -o size -s title -p 1 'industrial society and its future'\n\n" "$NAME" "$NAME"
-        printf "Options:\n  -o,  --order-by TYPE\tsort using TYPE, that can be: id,title,publisher,year,pages,language,size,extension\n"
-        printf "  -d,  --domain DOMAIN\tset domain to DOMAIN\n"
-        printf "  -s,  --search-by TYPE\tsearch by TYPE, that can be: def,title,author,series,publisher,year,isbn,language,md5,tags,extension\n"
-        printf "  -r,  --reverse NUM\tsort in reverse\n"
-        printf "  -f,  --format FORMAT\tspecify file format for results\n"
-        printf "  -m,  --mask\t\tuse wildcards for PATTERN\n"
-        printf "  -p,  --page NUM\tshow page at NUM\n"
-        printf "  -R,  --results NUM\tshow NUM results\n"
-        printf "  -T,  --non-fiction\tsearch non-fiction tab\n"
-        printf "  -S,  --science\tsearch scientific articles tab\n"
-        printf "  -F,  --fiction\tsearch fiction tab\n"
-        printf "  -h,  --help\t\tshow help\n"
+        printf "Options:\n  -o,  --order-by TYPE\t\tsort using TYPE, that can be: id,title,publisher,year,pages,language,size,extension\n"
+        printf "  -d,  --domain DOMAIN\t\tset domain to DOMAIN\n"
+        printf "  -D,  --delimiter DELIM\tset delimiter to DELIM\n"
+        printf "  -s,  --search-by TYPE\t\tsearch by TYPE, that can be: def,title,author,series,publisher,year,isbn,language,md5,tags,extension\n"
+        printf "  -r,  --reverse NUM\t\tsort in reverse\n"
+        printf "  -f,  --format FORMAT\t\tspecify file format for results\n"
+        printf "  -m,  --mask\t\t\tuse wildcards for PATTERN\n"
+        printf "  -p,  --page NUM\t\tshow page at NUM\n"
+        printf "  -R,  --results NUM\t\tshow NUM results\n"
+        printf "  -T,  --non-fiction\t\tsearch non-fiction tab\n"
+        printf "  -S,  --science\t\tsearch scientific articles tab\n"
+        printf "  -F,  --fiction\t\tsearch fiction tab\n"
+        printf "  -c,  --color\t\t\tcolor output\n"
+        printf "  -C,  --no-color\t\tdisable coloring of output\n"
+        printf "  -h,  --help\t\t\tshow help\n"
         printf "\nLink will be copied via xclip.\n"
-        exit 0
-        ;;
+        exit 0;;
     -r|--reverse)
-        REVERSE="ASC"
-        shift
-        ;;
+        REVERSE="ASC";;
     -f|--format)
         FORMAT="$2"
-        shift 2
-        ;;
+        shift;;
     -m|--mask)
-        MASK=0;
-        shift
-        ;;
+        MASK=0;;
     -d|--domain)
         DOMAIN="$2"
-        shift 2
-        ;;
+        shift;;
+    -D|--delimiter)
+        DELIM="$2"
+        shift;;
     -R|--results)
         RESULTS="$2"
-        shift 2
-        ;;
+        shift;;
     -p|--page)
         PAGE="$2"
-        shift 2
-        ;;
+        shift;;
     -T|--non-fiction)
-        TYPE=0;
-        shift
-        ;;
+        TYPE=0;;
     -F|--fiction)
-        TYPE=1;
-        shift
-        ;;
+        TYPE=1;;
     -S|--science)
-        TYPE=2;
-        shift
-        ;;
+        TYPE=2;;
+    -c|--color)
+        COLOR=1;;
+    -C|--no-color)
+        COLOR=0;;
     *)
-      SEARCH="$1"
-      shift
-      ;;
+      SEARCH="$1";;
   esac
+      shift
 done
 
 SEARCHP=$(echo "$SEARCH" | tr ' ' '+')
@@ -136,6 +139,11 @@ size="$(mktemp)"
 author="$(mktemp)"
 extension="$(mktemp)"
 trap 'rm "$t1" "$title" "$size" "$author" "$extension" "$links"' EXIT
+
+color_lines() {
+    sed "s/^/\x1b[$1m/; s/$/\x1b[0m/" "$2" > "$3"
+    cp "$3" "$2"
+}
 
 case $TYPE in
     0)
@@ -150,7 +158,17 @@ case $TYPE in
         sed -E '/<td><font color="gray">Year:<\/font><\/td>/{N; s/[^0-9]+?(([0-9]+)|.*).*/Year:\1/}; /^Year:/!d; s/^Year://' "$t1" > "$year"
         sed -E '/<td><font color="gray">Extension:<\/font><\/td>/{N; s/.*>([a-zA-Z0-9]+).*/Extension:\1/}; /^Extension:/!d; s/^Extension://' "$t1" > "$extension"
         hgrep 'td +colspan="2"' "$t1" | grep -oE '\?md5=[A-Z0-9]+' | sed 's/^\?md5=/http:\/\/library.lol\/main\//' > "$links"
-        paste "$title" "$pages" "$size" "$year" "$author" "$extension" | recode html..UTF-8 | nl
+
+        if [ "$COLOR" -eq 1 ]
+        then
+            color_lines "$C_SIZE" "$size" "$t1"
+            color_lines "$C_PAGES" "$pages" "$t1"
+            color_lines "$C_TITLE" "$title" "$t1"
+            color_lines "$C_EXTENSION" "$extension" "$t1"
+            color_lines "$C_AUTHOR" "$author" "$t1"
+            color_lines "$C_TIME" "$year" "$t1"
+        fi
+        paste -d "$DELIM" "$title" "$pages" "$size" "$year" "$author" "$extension" | recode html..UTF-8 | nl
         ;;
     1)
         [ "$SEARCHBY" = "$sby_def" ] && SEARCHBY=""
@@ -162,7 +180,15 @@ case $TYPE in
         hgrep 'td +title' "$t1" -printf "%i\n" | sed 's/ .*//; s/[A-Z]/\L&/g;' > "$extension"
         hgrep 'td +title' "$t1" -printf "%i\n" | sed 's/.* //' > "$size"
         hgrep 'ul +class="record_mirrors_compact"' "$t1" -printf "%i\n" | sed -E 's/^<li><a href="//; s/".*//'  > "$links"
-        paste "$title" "$author" "$size" "$extension" | recode html..UTF-8 | nl
+        
+        if [ "$COLOR" -eq 1 ]
+        then
+            color_lines "$C_SIZE" "$size" "$t1"
+            color_lines "$C_TITLE" "$title" "$t1"
+            color_lines "$C_EXTENSION" "$extension" "$t1"
+            color_lines "$C_AUTHOR" "$author" "$t1"
+        fi
+        paste -d "$DELIM" "$title" "$author" "$size" "$extension" | recode html..UTF-8 | nl
         ;;
     2)
         doi="$(mktemp)"
@@ -177,7 +203,16 @@ case $TYPE in
         sed '/title="edit metadata">/!d; s/<br>.*//' "$t1" > "$size"
         hgrep 'ul' "$t1" -printf '%i\n' | sed 's/^<li><a href="//; s/">.*//' > "$links"
 
-        paste -d '|' "$title" "$volume" "$author" "$doi" "$size" | recode html..UTF-8 | nl
+        if [ "$COLOR" -eq 1 ]
+        then
+            color_lines "$C_SIZE" "$size" "$t1"
+            color_lines "$C_DOI" "$doi" "$t1"
+            color_lines "$C_TITLE" "$title" "$t1"
+            color_lines "$C_VOLUME" "$volume" "$t1"
+            color_lines "$C_AUTHOR" "$author" "$t1"
+        fi
+        echo "$DELIM"
+        paste -d "$DELIM" "$title" "$volume" "$author" "$doi" "$size" | recode html..UTF-8 | nl
         ;;
 esac
 
