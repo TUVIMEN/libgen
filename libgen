@@ -172,7 +172,7 @@ case $TYPE in
         ;;
     1)
         [ "$SEARCHBY" = "$sby_def" ] && SEARCHBY=""
-        [ "$MASK -eq 1" ] && MASK=0 || MASK=1
+        [ "$MASK" -eq 1 ] && MASK=0 || MASK=1
 
         curl -s "$DOMAIN/fiction/?q=$SEARCHP&criteria=$SORT&format=$FORMAT&page=$PAGE" | hgrep 'tbody; tr' > "$t1"
         hgrep 'ul +class="catalog_authors"' "$t1" -printf "%i\n" | sed -E "s/\t//g; /^$/d; s/^<li>//g; s/<li>/,/g; s/<\/li>//g; s/<a href=?(\"|')[^\"']+?(\"|') title=?(\"|')[^\"']+?(\"|')>//g; s/<\/a>//g; s/, /,/g" > "$author"
@@ -219,7 +219,7 @@ esac
 printf 'num> '
 read -r NUMBER
 link="$(sed "s/ /%20/g; ${NUMBER}q;d" "$links")"
-if $(echo "$link" | grep '://sci-hub' -q)
+if echo "$link" | grep '://sci-hub' -q
 then
     curl -g -s "$link" | hgrep 'embed' -printf '%(src)a\n' | tee /dev/stderr | xclip -sel clip
 else
