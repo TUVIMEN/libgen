@@ -150,7 +150,7 @@ case $TYPE in
         pages="$(mktemp)"
         year="$(mktemp)"
         trap 'rm "$pages" "$year"' EXIT
-        curl -s "$DOMAIN/search.php?req=$SEARCHP&open=0&res=$RESULTS&view=detailed&phrase=$MASK&column=$SORT&page=$PAGE&sort=$ORDERBY&sortmode=$REVERSE" | hgrep 'table +rules="cols" +width="100%" +border="0"; tr /[-]/[2]' > "$t1"
+        curl -s "$DOMAIN/search.php?req=$SEARCHP&open=0&res=$RESULTS&view=detailed&phrase=$MASK&column=$SORT&page=$PAGE&sort=$ORDERBY&sortmode=$REVERSE" | hgrep 'table +rules="cols" +width="100%" +border="0"; tr @l[2]' > "$t1"
         hgrep 'td +colspan="2"; a @p"%i\n"' "$t1" > "$title"
         sed -E '/<td><font color="gray">Pages:<\/font><\/td>/{N; s/[^0-9]+([0-9]+).*/Pages:\1/}; /^Pages:/!d; s/^Pages://' "$t1" > "$pages"
         sed -E '/<td><font color="gray">Size:<\/font><\/td>/{N; s/[^0-9]+([0-9]+.*) \([0-9]+\).*/Size:\1/}; /^Size:/!d; s/^Size://' "$t1" > "$size"
@@ -176,7 +176,7 @@ case $TYPE in
 
         curl -s "$DOMAIN/fiction/?q=$SEARCHP&criteria=$SORT&format=$FORMAT&page=$PAGE" | hgrep 'tbody; tr' > "$t1"
         hgrep 'ul +class="catalog_authors" @p"%i\n"' "$t1" | sed -E "s/\t//g; /^$/d; s/^<li>//g; s/<li>/,/g; s/<\/li>//g; s/<a href=?(\"|')[^\"']+?(\"|') title=?(\"|')[^\"']+?(\"|')>//g; s/<\/a>//g; s/, /,/g" > "$author"
-        hgrep 'td; a -title /[-][1] @p"%i\n"' "$t1" > "$title"
+        hgrep 'td; a -title @l[1] @p"%i\n"' "$t1" > "$title"
         hgrep 'td +title @p"%i\n"' "$t1" | sed 's/ .*//; s/[A-Z]/\L&/g;' > "$extension"
         hgrep 'td +title @p"%i\n"' "$t1" | sed 's/.* //' > "$size"
         hgrep 'ul +class="record_mirrors_compact" @p"%i\n"' "$t1" | sed -E 's/^<li><a href="//; s/".*//'  > "$links"
