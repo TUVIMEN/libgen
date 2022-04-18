@@ -151,10 +151,10 @@ case $TYPE in
         year="$(mktemp)"
         trap 'rm "$pages" "$year"' EXIT
         curl -s "$DOMAIN/search.php?req=$SEARCHP&open=0&res=$RESULTS&view=detailed&phrase=$MASK&column=$SORT&page=$PAGE&sort=$ORDERBY&sortmode=$REVERSE" | hgrep 'table +rules="cols" +width="100%" +border="0"; tr /[-]/[2]' > "$t1"
-        hgrep 'td +colspan="2"; a' "$t1" -printf "%i\n" > "$title"
+        hgrep 'td +colspan="2"; a @p"%i\n"' "$t1" > "$title"
         sed -E '/<td><font color="gray">Pages:<\/font><\/td>/{N; s/[^0-9]+([0-9]+).*/Pages:\1/}; /^Pages:/!d; s/^Pages://' "$t1" > "$pages"
         sed -E '/<td><font color="gray">Size:<\/font><\/td>/{N; s/[^0-9]+([0-9]+.*) \([0-9]+\).*/Size:\1/}; /^Size:/!d; s/^Size://' "$t1" > "$size"
-        hgrep 'td +colspan="3"; b' "$t1" -printf "%i\n" | sed -E "s/<a href=?(\"|')[^\"']+?(\"|')>//g; s/<\/a>//g; s/, /,/g" > "$author"
+        hgrep 'td +colspan="3"; b @p"%i\n"' "$t1" | sed -E "s/<a href=?(\"|')[^\"']+?(\"|')>//g; s/<\/a>//g; s/, /,/g" > "$author"
         sed -E '/<td><font color="gray">Year:<\/font><\/td>/{N; s/[^0-9]+?(([0-9]+)|.*).*/Year:\1/}; /^Year:/!d; s/^Year://' "$t1" > "$year"
         sed -E '/<td><font color="gray">Extension:<\/font><\/td>/{N; s/.*>([a-zA-Z0-9]+).*/Extension:\1/}; /^Extension:/!d; s/^Extension://' "$t1" > "$extension"
         hgrep 'td +colspan="2"' "$t1" | grep -oE '\?md5=[A-Z0-9]+' | sed 's/^\?md5=/http:\/\/library.lol\/main\//' > "$links"
@@ -175,11 +175,11 @@ case $TYPE in
         [ "$MASK" -eq 1 ] && MASK=0 || MASK=1
 
         curl -s "$DOMAIN/fiction/?q=$SEARCHP&criteria=$SORT&format=$FORMAT&page=$PAGE" | hgrep 'tbody; tr' > "$t1"
-        hgrep 'ul +class="catalog_authors"' "$t1" -printf "%i\n" | sed -E "s/\t//g; /^$/d; s/^<li>//g; s/<li>/,/g; s/<\/li>//g; s/<a href=?(\"|')[^\"']+?(\"|') title=?(\"|')[^\"']+?(\"|')>//g; s/<\/a>//g; s/, /,/g" > "$author"
-        hgrep 'td; a -title /[-][1]' "$t1" -printf "%i\n" > "$title"
-        hgrep 'td +title' "$t1" -printf "%i\n" | sed 's/ .*//; s/[A-Z]/\L&/g;' > "$extension"
-        hgrep 'td +title' "$t1" -printf "%i\n" | sed 's/.* //' > "$size"
-        hgrep 'ul +class="record_mirrors_compact"' "$t1" -printf "%i\n" | sed -E 's/^<li><a href="//; s/".*//'  > "$links"
+        hgrep 'ul +class="catalog_authors" @p"%i\n"' "$t1" | sed -E "s/\t//g; /^$/d; s/^<li>//g; s/<li>/,/g; s/<\/li>//g; s/<a href=?(\"|')[^\"']+?(\"|') title=?(\"|')[^\"']+?(\"|')>//g; s/<\/a>//g; s/, /,/g" > "$author"
+        hgrep 'td; a -title /[-][1] @p"%i\n"' "$t1" > "$title"
+        hgrep 'td +title @p"%i\n"' "$t1" | sed 's/ .*//; s/[A-Z]/\L&/g;' > "$extension"
+        hgrep 'td +title @p"%i\n"' "$t1" | sed 's/.* //' > "$size"
+        hgrep 'ul +class="record_mirrors_compact" @p"%i\n"' "$t1" | sed -E 's/^<li><a href="//; s/".*//'  > "$links"
         
         if [ "$COLOR" -eq 1 ]
         then
@@ -195,13 +195,13 @@ case $TYPE in
         volume="$(mktemp)"
         trap 'rm "$doi" "$volume"' EXIT
 
-        curl -s "$DOMAIN/scimag/?q=$SEARCHP&page=$PAGE" | sed 's/<p>volume/volume/' | hgrep 'tbody; tr; td' -printf "%i\n" > "$t1"
+        curl -s "$DOMAIN/scimag/?q=$SEARCHP&page=$PAGE" | sed 's/<p>volume/volume/' | hgrep 'tbody; tr; td @p"%i\n"' > "$t1"
         sed -E '/^[^<>]+$/!d' "$t1" > "$author"
-        hgrep 'p; a' "$t1" -printf '%i\n' | sed 'N; s/\n/ - /;' > "$title"
+        hgrep 'p; a @p"%i\n"' "$t1" | sed 'N; s/\n/ - /;' > "$title"
         sed -E '/^[[:space:]]+<p>DOI: [^<>]+<\/p>/!d; s/.*DOI: //; s/<\/p>.*//' "$t1" > "$doi"
         sed '/<\/a>volume.*<\/p>/!d; s/.*volume/volume/; s/<\/p>$//' "$t1" > "$volume"
         sed '/title="edit metadata">/!d; s/<br>.*//' "$t1" > "$size"
-        hgrep 'ul' "$t1" -printf '%i\n' | sed 's/^<li><a href="//; s/">.*//' > "$links"
+        hgrep 'ul @p"%i\n"' "$t1" | sed 's/^<li><a href="//; s/">.*//' > "$links"
 
         if [ "$COLOR" -eq 1 ]
         then
@@ -221,7 +221,8 @@ read -r NUMBER
 link="$(sed "s/ /%20/g; ${NUMBER}q;d" "$links")"
 if echo "$link" | grep '://sci-hub' -q
 then
-    curl -g -s "$link" | hgrep 'embed' -printf '%(src)a\n' | tee /dev/stderr | xclip -sel clip
+    echo "$link"
+    curl -g -s "$link" | hgrep 'embed @p"%(src)a\n"' | tee /dev/stderr | xclip -sel clip
 else
-    curl -g -s "$link" | hgrep 'h2; a +href' -printf '%(href)a\n' | tee /dev/stderr | xclip -sel clip
+    curl -g -s "$link" | hgrep 'h2; a +href @p"%(href)a\n"' | tee /dev/stderr | xclip -sel clip
 fi
