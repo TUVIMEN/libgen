@@ -222,7 +222,7 @@ link="$(sed "s/ /%20/g; ${NUMBER}q;d" "$links")"
 if echo "$link" | grep '://sci-hub' -q
 then
     echo "$link"
-    curl -g -s "$link" | hgrep 'embed @p"%(src)a\n"' | tee /dev/stderr | xclip -sel clip
+    curl -g -s "$link" | hgrep 'embed @p"%(src)a\n"' | tee /dev/stderr | tr -d '\n' | xclip -sel clip
 else
-    curl -g -s "$link" | hgrep 'h2; a +href @p"%(href)a\n"' | tee /dev/stderr | xclip -sel clip
+    curl -g -s "$link" | hgrep 'h2; a +href @p"%(href)a\n"' | tee /dev/stderr | tr -d '\n' | xclip -sel clip
 fi
