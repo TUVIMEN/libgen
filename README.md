@@ -7,5 +7,5 @@ A shell script for searching on libgen.
  - xclip
  - [recode](https://github.com/rrthomas/recode)
 
-## Instalation
+## Installation
     install -m 755 libgen /usr/bin
