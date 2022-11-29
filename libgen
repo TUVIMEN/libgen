@@ -45,6 +45,8 @@ C_VOLUME="34"
 C_TITLE="39"
 COLOR=1
 
+alias ucurl='curl -H "User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) QtWebEngine/5.15.2 Chrome/87.0.4280.144 Safari/537.36" -H "Accept-Encoding: gzip, deflate" --compressed'
+
 while [ $# -gt 0 ]
 do
   case "$1" in
@@ -150,7 +152,7 @@ case $TYPE in
         pages="$(mktemp)"
         year="$(mktemp)"
         trap 'rm "$pages" "$year"' EXIT
-        curl -s "$DOMAIN/search.php?req=$SEARCHP&open=0&res=$RESULTS&view=detailed&phrase=$MASK&column=$SORT&page=$PAGE&sort=$ORDERBY&sortmode=$REVERSE" | hgrep 'table +rules="cols" +width="100%" +border="0"; tr @l[2]' > "$t1"
+        ucurl -s "$DOMAIN/search.php?req=$SEARCHP&open=0&res=$RESULTS&view=detailed&phrase=$MASK&column=$SORT&page=$PAGE&sort=$ORDERBY&sortmode=$REVERSE" | hgrep 'table +rules="cols" +width="100%" +border="0"; tr @l[2]' > "$t1"
         hgrep 'td +colspan="2"; a @p"%i\n"' "$t1" > "$title"
         sed -E '/<td><font color="gray">Pages:<\/font><\/td>/{N; s/[^0-9]+([0-9]+).*/Pages:\1/}; /^Pages:/!d; s/^Pages://' "$t1" > "$pages"
         sed -E '/<td><font color="gray">Size:<\/font><\/td>/{N; s/[^0-9]+([0-9]+.*) \([0-9]+\).*/Size:\1/}; /^Size:/!d; s/^Size://' "$t1" > "$size"
@@ -174,7 +176,7 @@ case $TYPE in
         [ "$SEARCHBY" = "$sby_def" ] && SEARCHBY=""
         [ "$MASK" -eq 1 ] && MASK=0 || MASK=1
 
-        curl -s "$DOMAIN/fiction/?q=$SEARCHP&criteria=$SORT&format=$FORMAT&page=$PAGE" | hgrep 'tbody; tr' > "$t1"
+        ucurl -s "$DOMAIN/fiction/?q=$SEARCHP&criteria=$SORT&format=$FORMAT&page=$PAGE" | hgrep 'tbody; tr' > "$t1"
         hgrep 'ul +class="catalog_authors" @p"%i\n"' "$t1" | sed -E "s/\t//g; /^$/d; s/^<li>//g; s/<li>/,/g; s/<\/li>//g; s/<a href=?(\"|')[^\"']+?(\"|') title=?(\"|')[^\"']+?(\"|')>//g; s/<\/a>//g; s/, /,/g" > "$author"
         hgrep 'td; a -title @l[1] @p"%i\n"' "$t1" > "$title"
         hgrep 'td +title @p"%i\n"' "$t1" | sed 's/ .*//; s/[A-Z]/\L&/g;' > "$extension"
@@ -195,7 +197,7 @@ case $TYPE in
         volume="$(mktemp)"
         trap 'rm "$doi" "$volume"' EXIT
 
-        curl -s "$DOMAIN/scimag/?q=$SEARCHP&page=$PAGE" | sed 's/<p>volume/volume/' | hgrep 'tbody; tr; td @p"%i\n"' > "$t1"
+        ucurl -s "$DOMAIN/scimag/?q=$SEARCHP&page=$PAGE" | sed 's/<p>volume/volume/' | hgrep 'tbody; tr; td @p"%i\n"' > "$t1"
         sed -E '/^[^<>]+$/!d' "$t1" > "$author"
         hgrep 'p; a @p"%i\n"' "$t1" | sed 'N; s/\n/ - /;' > "$title"
         sed -E '/^[[:space:]]+<p>DOI: [^<>]+<\/p>/!d; s/.*DOI: //; s/<\/p>.*//' "$t1" > "$doi"
@@ -222,7 +224,7 @@ link="$(sed "s/ /%20/g; ${NUMBER}q;d" "$links")"
 if echo "$link" | grep '://sci-hub' -q
 then
     echo "$link"
-    curl -g -s "$link" | hgrep 'embed @p"%(src)a\n"' | tee /dev/stderr | tr -d '\n' | xclip -sel clip
+    ucurl -g -s "$link" | hgrep 'embed @p"%(src)a\n"' | tee /dev/stderr | tr -d '\n' | xclip -sel clip
 else
-    curl -g -s "$link" | hgrep 'h2; a +href @p"%(href)a\n"' | tee /dev/stderr | tr -d '\n' | xclip -sel clip
+    ucurl -g -s "$link" | hgrep 'h2; a +href @p"%(href)a\n"' | tee /dev/stderr | tr -d '\n' | xclip -sel clip
 fi
