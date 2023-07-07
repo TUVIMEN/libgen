@@ -15,11 +15,11 @@ A shell script for searching on libgen.
 
 ## Usage
 
-Just type 'libgen "your search"', choose what you want and the link will be copied to your clipboard.
+Just type 'libgen your search', choose what you want and the link will be copied to your clipboard.
 
 Search for scientific articles about evolution on 2nd page
 
-    libgen -p 2 S 'evolution'
+    libgen -p 2 -S 'evolution'
 
 Search for Lovecraft's fiction in pdf format
 

@@ -34,14 +34,16 @@ FORMAT=""
 TYPE=0
 MASK=1
 ORDERBY=""
+LANG=""
 
-C_DOI="32"
+#C_DOI="32"
 C_SIZE="33"
 C_EXTENSION="34"
 C_AUTHOR="35"
 C_TIME="31"
 C_PAGES="32"
 C_VOLUME="34"
+C_LANGUAGE="34"
 C_TITLE="39"
 COLOR=1
 
@@ -84,12 +86,13 @@ do
         printf "  -d,  --domain DOMAIN\t\tset domain to DOMAIN\n"
         printf "  -D,  --delimiter DELIM\tset delimiter to DELIM\n"
         printf "  -s,  --search-by TYPE\t\tsearch by TYPE, that can be: def,title,author,series,publisher,year,isbn,language,md5,tags,extension\n"
+        printf "  -l,  --language LANG\t\tspecify language for results (only for fiction)\n"
         printf "  -r,  --reverse NUM\t\tsort in reverse\n"
         printf "  -f,  --format FORMAT\t\tspecify file format for results\n"
         printf "  -m,  --mask\t\t\tuse wildcards for PATTERN\n"
         printf "  -p,  --page NUM\t\tshow page at NUM\n"
         printf "  -R,  --results NUM\t\tshow NUM results\n"
-        printf "  -T,  --non-fiction\t\tsearch non-fiction tab\n"
+        printf "  -T,  --non-fiction\t\tsearch non-fiction tab (set by default)\n"
         printf "  -S,  --science\t\tsearch scientific articles tab\n"
         printf "  -F,  --fiction\t\tsearch fiction tab\n"
         printf "  -c,  --color\t\t\tcolor output\n"
@@ -101,6 +104,9 @@ do
         REVERSE="ASC";;
     -f|--format)
         FORMAT="$2"
+        shift;;
+    -l|--language)
+        LANG="$2"
         shift;;
     -m|--mask)
         MASK=0;;
@@ -127,104 +133,149 @@ do
     -C|--no-color)
         COLOR=0;;
     *)
-      SEARCH="$1";;
+        if [ -z "$SEARCH" ]
+        then
+          SEARCH="$1"
+        else
+          SEARCH="$SEARCH $1"
+        fi;;
   esac
-      shift
+  shift
 done
 
 SEARCHP=$(echo "$SEARCH" | tr ' ' '+')
 
-t1="$(mktemp)"
-links="$(mktemp)"
-title="$(mktemp)"
-size="$(mktemp)"
-author="$(mktemp)"
-extension="$(mktemp)"
-trap 'rm "$t1" "$title" "$size" "$author" "$extension" "$links"' EXIT
-
-color_lines() {
-    sed "s/^/\x1b[$1m/; s/$/\x1b[0m/" "$2" > "$3"
-    cp "$3" "$2"
-}
-
 case $TYPE in
     0)
-        pages="$(mktemp)"
-        year="$(mktemp)"
-        trap 'rm "$pages" "$year"' EXIT
-        ucurl -s "$DOMAIN/search.php?req=$SEARCHP&open=0&res=$RESULTS&view=detailed&phrase=$MASK&column=$SORT&page=$PAGE&sort=$ORDERBY&sortmode=$REVERSE" | hgrep 'table +rules="cols" +width="100%" +border="0"; tr @l[2]' > "$t1"
-        hgrep 'td +colspan="2"; a @p"%i\n"' "$t1" > "$title"
-        sed -E '/<td><font color="gray">Pages:<\/font><\/td>/{N; s/[^0-9]+([0-9]+).*/Pages:\1/}; /^Pages:/!d; s/^Pages://' "$t1" > "$pages"
-        sed -E '/<td><font color="gray">Size:<\/font><\/td>/{N; s/[^0-9]+([0-9]+.*) \([0-9]+\).*/Size:\1/}; /^Size:/!d; s/^Size://' "$t1" > "$size"
-        hgrep 'td +colspan="3"; b @p"%i\n"' "$t1" | sed -E "s/<a href=?(\"|')[^\"']+?(\"|')>//g; s/<\/a>//g; s/, /,/g" > "$author"
-        sed -E '/<td><font color="gray">Year:<\/font><\/td>/{N; s/[^0-9]+?(([0-9]+)|.*).*/Year:\1/}; /^Year:/!d; s/^Year://' "$t1" > "$year"
-        sed -E '/<td><font color="gray">Extension:<\/font><\/td>/{N; s/.*>([a-zA-Z0-9]+).*/Extension:\1/}; /^Extension:/!d; s/^Extension://' "$t1" > "$extension"
-        hgrep 'td +colspan="2"' "$t1" | grep -oE '\?md5=[A-Z0-9]+' | sed 's/^\?md5=/http:\/\/library.lol\/main\//' > "$links"
+        t1="$(ucurl -s "$DOMAIN/search.php?req=$SEARCHP&open=0&res=$RESULTS&view=detailed&phrase=$MASK&column=$SEARCHBY&page=$PAGE&sort=$ORDERBY&sortmode=$REVERSE" | hgrep 'table +rules="cols" +width="100%" +border="0"; tr @l[2]')"
+        links="$(echo "$t1" | hgrep 'td +colspan="2"' | grep -oE '\?md5=[A-Z0-9]+' | sed 's/^\?md5=/http:\/\/library.lol\/main\//')"
+        {
+        echo "$t1" | hgrep 'td +colspan="2"; a @p"%i\n"' #title
+        echo "$t1" | sed -E '/<td><font color="gray">Pages:<\/font><\/td>/{N; s/[^0-9]+([0-9]+).*/Pages:\1/}; /^Pages:/!d; s/^Pages://' #pages
+        echo "$t1" | sed -E '/<td><font color="gray">Size:<\/font><\/td>/{N; s/[^0-9]+([0-9]+.*) \([0-9]+\).*/Size:\1/}; /^Size:/!d; s/^Size://' #size
+        echo "$t1" | sed -E '/<td><font color="gray">Year:<\/font><\/td>/{N; s/[^0-9]+?(([0-9]+)|.*).*/Year:\1/}; /^Year:/!d; s/^Year://' #year
+        echo "$t1" | hgrep 'td +colspan="3"; b @p"%i\n"' | sed -E "s/<a href=?(\"|')[^\"']+?(\"|')>//g; s/<\/a>//g; s/, /,/g" #author
+        echo "$t1" | sed -E '/<td><font color="gray">Extension:<\/font><\/td>/{N; s/.*>([a-zA-Z0-9]+).*/Extension:\1/}; /^Extension:/!d; s/^Extension://' #extension
+        } | recode html..UTF-8 | awk 'function print_fields(lines,fields,step) {
+            colors[0] = '"$C_TITLE"'
+            colors[1] = '"$C_PAGES"'
+            colors[2] = '"$C_SIZE"'
+            colors[3] = '"$C_TIME"'
+            colors[4] = '"$C_AUTHOR"'
+            colors[5] = '"$C_EXTENSION"'
+            ORS = ""
+            for (i = 0; i < step; i++) {
+                for (j = 0; j < fields; j++) {
+                    if (j != 0)
+                        print "'"$DELIM"'"
+                    if ('"$COLOR"')
+                        print "\033["colors[j]"m"lines[(step*j)+i]"\033[0m"
+                    else
+                        print lines[(step*j)+i]
+                }
+                printf "\n"
+            }
+        }
 
-        if [ "$COLOR" -eq 1 ]
-        then
-            color_lines "$C_SIZE" "$size" "$t1"
-            color_lines "$C_PAGES" "$pages" "$t1"
-            color_lines "$C_TITLE" "$title" "$t1"
-            color_lines "$C_EXTENSION" "$extension" "$t1"
-            color_lines "$C_AUTHOR" "$author" "$t1"
-            color_lines "$C_TIME" "$year" "$t1"
-        fi
-        paste -d "$DELIM" "$title" "$pages" "$size" "$year" "$author" "$extension" | recode html..UTF-8 | nl
-        ;;
+        BEGIN { l=0; fields = 6 }
+        { lines[l++]=$0 }
+        END {
+            if (l >= fields)
+            if (l%fields == 0) {
+                    step = l/fields
+                    print_fields(lines,fields,step)
+            } else
+                print "length of some data fields does not match the others"
+        }' | nl;;
     1)
         [ "$SEARCHBY" = "$sby_def" ] && SEARCHBY=""
         [ "$MASK" -eq 1 ] && MASK=0 || MASK=1
 
-        ucurl -s "$DOMAIN/fiction/?q=$SEARCHP&criteria=$SORT&format=$FORMAT&page=$PAGE" | hgrep 'tbody; tr' > "$t1"
-        hgrep 'ul +class="catalog_authors" @p"%i\n"' "$t1" | sed -E "s/\t//g; /^$/d; s/^<li>//g; s/<li>/,/g; s/<\/li>//g; s/<a href=?(\"|')[^\"']+?(\"|') title=?(\"|')[^\"']+?(\"|')>//g; s/<\/a>//g; s/, /,/g" > "$author"
-        hgrep 'td; a -title @l[1] @p"%i\n"' "$t1" > "$title"
-        hgrep 'td +title @p"%i\n"' "$t1" | sed 's/ .*//; s/[A-Z]/\L&/g;' > "$extension"
-        hgrep 'td +title @p"%i\n"' "$t1" | sed 's/.* //' > "$size"
-        hgrep 'ul +class="record_mirrors_compact" @p"%i\n"' "$t1" | sed -E 's/^<li><a href="//; s/".*//'  > "$links"
-        
-        if [ "$COLOR" -eq 1 ]
-        then
-            color_lines "$C_SIZE" "$size" "$t1"
-            color_lines "$C_TITLE" "$title" "$t1"
-            color_lines "$C_EXTENSION" "$extension" "$t1"
-            color_lines "$C_AUTHOR" "$author" "$t1"
-        fi
-        paste -d "$DELIM" "$title" "$author" "$size" "$extension" | recode html..UTF-8 | nl
-        ;;
+        t1="$(ucurl -s "$DOMAIN/fiction/?q=$SEARCHP&criteria=$SEARCHBY&language=$LANG&wildcard=$MASK&format=$FORMAT&page=$PAGE" | hgrep 'tbody; tr')"
+        links="$(echo "$t1" | hgrep 'ul +class="record_mirrors_compact" @p"%i\n"' | sed -E 's/^<li><a href="//; s/".*//')"
+        {
+        echo "$t1" | hgrep 'td; a -title @p"%i\n"' #title
+        echo "$t1" | hgrep 'ul +class="catalog_authors" @p"%i\n"' | sed -E "s/\t//g; /^$/d; s/^<li>//g; s/<li>/,/g; s/<\/li>//g; s/<a href=?(\"|')[^\"']+?(\"|') title=?(\"|')[^\"']+?(\"|')>//g; s/<\/a>//g; s/, /,/g" #author
+        echo "$t1" | hgrep 'td +title @p"%i\n"' | sed 's/.* //' #size
+        echo "$t1" | hgrep 'td +title @p"%i\n"' | sed 's/ .*//; s/[A-Z]/\L&/g;' #extension
+        echo "$t1" | hgrep 'td -title @M"<" @p"%i\n"' | sed 'N;s/.*\n//' #language
+        } | recode html..UTF-8 | awk 'function print_fields(lines,fields,step) {
+            colors[0] = '"$C_TITLE"'
+            colors[1] = '"$C_AUTHOR"'
+            colors[2] = '"$C_SIZE"'
+            colors[3] = '"$C_EXTENSION"'
+            colors[4] = '"$C_LANGUAGE"'
+            ORS = ""
+            for (i = 0; i < step; i++) {
+                for (j = 0; j < fields; j++) {
+                    if (j != 0)
+                        print "'"$DELIM"'"
+                    if ('"$COLOR"')
+                        print "\033["colors[j]"m"lines[(step*j)+i]"\033[0m"
+                    else
+                        print lines[(step*j)+i]
+                }
+                printf "\n"
+            }
+        }
+
+        BEGIN { l=0; fields = 5 }
+        { lines[l++]=$0 }
+        END {
+            if (l >= fields)
+            if (l%fields == 0) {
+                    step = l/fields
+                    print_fields(lines,fields,step)
+            } else
+                print "length of some data fields does not match the others"
+        }' | nl;;
     2)
-        doi="$(mktemp)"
-        volume="$(mktemp)"
-        trap 'rm "$doi" "$volume"' EXIT
+        t1="$(ucurl -s "$DOMAIN/scimag/?q=$SEARCHP&page=$PAGE" | sed 's/<p>volume/volume/' | hgrep 'tbody; tr; td @p"%i\n"')"
+        links="$(echo "$t1" | hgrep 'ul @p"%i\n"' | sed 's/^<li><a href="//; s/">.*//')"
+        {
+        echo "$t1" | hgrep 'p; a @p"%i\n"' | sed 'N; s/\n/ - /;' #title
+        echo "$t1" | sed -E '/^[^<>]*$/!d' | sed 'N;s/\n.*//' #author
+        #echo "$t1" | sed -E '/^[[:space:]]+<p>DOI: [^<>]+<\/p>/!d; s/.*DOI: //; s/<\/p>.*//' #doi
+        echo "$t1" | sed '/title="edit metadata">/!d; s/<br>.*//; s/&nbsp;//' #$size
+        echo "$t1" | sed '/<\/a>volume.*<\/p>/!d; s/.*volume/volume/; s/<\/p>$//; s/&nbsp;//g' #volume
+        } | recode html..UTF-8 | awk 'function print_fields(lines,fields,step) {
+            colors[0] = '"$C_TITLE"'
+            colors[1] = '"$C_AUTHOR"'
+            colors[2] = '"$C_SIZE"'
+            colors[3] = '"$C_VOLUME"'
+            ORS = ""
+            for (i = 0; i < step; i++) {
+                for (j = 0; j < fields; j++) {
+                    if (j != 0)
+                        print "'"$DELIM"'"
+                    if ('"$COLOR"')
+                        print "\033["colors[j]"m"lines[(step*j)+i]"\033[0m"
+                    else
+                        print lines[(step*j)+i]
+                }
+                printf "\n"
+            }
+        }
 
-        ucurl -s "$DOMAIN/scimag/?q=$SEARCHP&page=$PAGE" | sed 's/<p>volume/volume/' | hgrep 'tbody; tr; td @p"%i\n"' > "$t1"
-        sed -E '/^[^<>]+$/!d' "$t1" > "$author"
-        hgrep 'p; a @p"%i\n"' "$t1" | sed 'N; s/\n/ - /;' > "$title"
-        sed -E '/^[[:space:]]+<p>DOI: [^<>]+<\/p>/!d; s/.*DOI: //; s/<\/p>.*//' "$t1" > "$doi"
-        sed '/<\/a>volume.*<\/p>/!d; s/.*volume/volume/; s/<\/p>$//' "$t1" > "$volume"
-        sed '/title="edit metadata">/!d; s/<br>.*//' "$t1" > "$size"
-        hgrep 'ul @p"%i\n"' "$t1" | sed 's/^<li><a href="//; s/">.*//' > "$links"
-
-        if [ "$COLOR" -eq 1 ]
-        then
-            color_lines "$C_SIZE" "$size" "$t1"
-            color_lines "$C_DOI" "$doi" "$t1"
-            color_lines "$C_TITLE" "$title" "$t1"
-            color_lines "$C_VOLUME" "$volume" "$t1"
-            color_lines "$C_AUTHOR" "$author" "$t1"
-        fi
-        echo "$DELIM"
-        paste -d "$DELIM" "$title" "$volume" "$author" "$doi" "$size" | recode html..UTF-8 | nl
-        ;;
+        BEGIN { l=0; fields = 4 }
+        { lines[l++]=$0 }
+        END {
+            if (l >= fields)
+            if (l%fields == 0) {
+                    step = l/fields
+                    print_fields(lines,fields,step)
+            } else
+                print "length of some data fields does not match the others"
+        }' | nl;;
 esac
 
+[ -z "$links" ] && exit 1
 printf 'num> '
 read -r NUMBER
-link="$(sed "s/ /%20/g; ${NUMBER}q;d" "$links")"
+link="$(echo "$links" | sed "s/ /%20/g; ${NUMBER}q;d")"
 if echo "$link" | grep '://sci-hub' -q
 then
-    echo "$link"
-    ucurl -g -s "$link" | hgrep 'embed @p"%(src)a\n"' | tee /dev/stderr | tr -d '\n' | xclip -sel clip
+    ucurl -g -s "$link" | hgrep 'embed @p"%(src)a\n"' | sed 's/^/https:/' | tee /dev/stderr | tr -d '\n' | xclip -sel clip
 else
-    ucurl -g -s "$link" | hgrep 'h2; a +href @p"%(href)a\n"' | tee /dev/stderr | tr -d '\n' | xclip -sel clip
+    ucurl -g -s "$link" | hgrep 'h2; a +href @p"%(href)a\n" @l[1]' | tee /dev/stderr | tr -d '\n' | xclip -sel clip
 fi
