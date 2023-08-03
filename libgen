@@ -147,11 +147,11 @@ SEARCHP=$(echo "$SEARCH" | tr ' ' '+')
 
 case $TYPE in
     0)
-        t1="$(ucurl -s "$DOMAIN/search.php?req=$SEARCHP&open=0&res=$RESULTS&view=detailed&phrase=$MASK&column=$SEARCHBY&page=$PAGE&sort=$ORDERBY&sortmode=$REVERSE" | hgrep 'table +rules="cols" +width="100%" +border="0"; tr @l[2]')"
+        t1="$(ucurl -s "$DOMAIN/search.php?req=$SEARCHP&open=0&res=$RESULTS&view=detailed&phrase=$MASK&column=$SEARCHBY&page=$PAGE&sort=$ORDERBY&sortmode=$REVERSE" | tr -d '\r' | hgrep 'table +rules="cols" +width="100%" +border="0"; tr @l[2]')"
         links="$(echo "$t1" | hgrep 'td +colspan="2"' | grep -oE '\?md5=[A-Z0-9]+' | sed 's/^\?md5=/http:\/\/library.lol\/main\//')"
         {
         echo "$t1" | hgrep 'td +colspan="2"; a @p"%i\n"' #title
-        echo "$t1" | sed -E '/<td><font color="gray">Pages:<\/font><\/td>/{N; s/[^0-9]+([0-9]+).*/Pages:\1/}; /^Pages:/!d; s/^Pages://' #pages
+        echo "$t1" | sed -En '/<td><font color="gray">Pages:<\/font><\/td>/{N;s/.*\n//;s/<td>//;s/<\/td>//;s/<br>.*//;s/.*, //;p}' #pages
         echo "$t1" | sed -E '/<td><font color="gray">Size:<\/font><\/td>/{N; s/[^0-9]+([0-9]+.*) \([0-9]+\).*/Size:\1/}; /^Size:/!d; s/^Size://' #size
         echo "$t1" | sed -E '/<td><font color="gray">Year:<\/font><\/td>/{N; s/[^0-9]+?(([0-9]+)|.*).*/Year:\1/}; /^Year:/!d; s/^Year://' #year
         echo "$t1" | hgrep 'td +colspan="3"; b @p"%i\n"' | sed -E "s/<a href=?(\"|')[^\"']+?(\"|')>//g; s/<\/a>//g; s/, /,/g" #author
