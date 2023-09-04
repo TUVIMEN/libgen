@@ -277,5 +277,5 @@ if echo "$link" | grep '://sci-hub' -q
 then
     ucurl -g -s "$link" | hgrep 'embed @p"%(src)a\n"' | sed 's/^/https:/' | tee /dev/stderr | tr -d '\n' | xclip -sel clip
 else
-    ucurl -g -s "$link" | hgrep 'h2; a +href @p"%(href)a\n" @l[1]' | tee /dev/stderr | tr -d '\n' | xclip -sel clip
+    ucurl -g -s "$link" | hgrep 'h2; a +href @p"%(href)a\n" @l[1]' | tee /dev/stderr | head -n1 | tr -d '\n' | xclip -sel clip
 fi
