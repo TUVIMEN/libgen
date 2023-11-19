@@ -1,3 +1,7 @@
+# Archive
+
+Any further development has been transfered to [torge](https://github.com/TUVIMEN/torge).
+
 # libgen
 
 A shell script for searching on libgen.

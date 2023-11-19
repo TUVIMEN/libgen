@@ -87,7 +87,7 @@ do
         printf "  -D,  --delimiter DELIM\tset delimiter to DELIM\n"
         printf "  -s,  --search-by TYPE\t\tsearch by TYPE, that can be: def,title,author,series,publisher,year,isbn,language,md5,tags,extension\n"
         printf "  -l,  --language LANG\t\tspecify language for results (only for fiction)\n"
-        printf "  -r,  --reverse NUM\t\tsort in reverse\n"
+        printf "  -r,  --reverse\t\tsort in reverse\n"
         printf "  -f,  --format FORMAT\t\tspecify file format for results\n"
         printf "  -m,  --mask\t\t\tuse wildcards for PATTERN\n"
         printf "  -p,  --page NUM\t\tshow page at NUM\n"
